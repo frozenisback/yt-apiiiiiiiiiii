@@ -28,9 +28,8 @@ cookie_file.flush()
 cookie_file.close()
 
 # ---- Simple in-memory cache ----
-# cache[url] = { "audio": ..., "title": ..., "timestamp": ... }
 CACHE = {}
-CACHE_TTL = 60 * 60  # 1 hour per entry
+CACHE_TTL = 60 * 60  # 1 hour
 
 @app.route("/")
 def home():
@@ -51,12 +50,12 @@ def down():
             "cached": True
         })
 
-    # Otherwise resolve using yt-dlp
     ydl_opts = {
         "quiet": True,
         "skip_download": True,
         "noplaylist": True,
         "cookiefile": cookie_file.name,
+        "format": "bestaudio",  # Force audio-only formats
     }
 
     try:
@@ -64,9 +63,13 @@ def down():
             info = ydl.extract_info(url, download=False)
             title = info.get("title", "Unknown Title")
 
-            audio_formats = [f for f in info.get("formats", []) if f.get("acodec") != "none"]
+            # Only audio formats (filter out any with video)
+            audio_formats = [
+                f for f in info.get("formats", [])
+                if f.get("acodec") != "none" and f.get("vcodec") == "none"
+            ]
             if not audio_formats:
-                return jsonify({"error": "No audio formats found"}), 404
+                return jsonify({"error": "No pure audio formats found"}), 404
 
             # Sort by audio bitrate ascending (lowest first)
             audio_formats.sort(key=lambda f: f.get("abr", 0) or 0)
