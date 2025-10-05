@@ -152,7 +152,8 @@ def spotify_down():
         logging.error(f"Votify failed: {e.stderr}")
         return jsonify({"error": "Votify failed", "details": e.stderr}), 500
     except Exception as e:
-        logging.exception("Unexpected error in s
+        logging.exception("Unexpected error in spotify_down")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     try:
