@@ -112,7 +112,7 @@ def spotify_down():
         logging.error("Missing url parameter")
         return jsonify({"error": "Missing url parameter"}), 400
 
-    cookies_file = r"C:\Users\PC\Downloads\spotifycookies.txt"
+    cookies_file = "spotifycookies.txt"
     temp_dir = tempfile.mkdtemp()  # temporary output folder
     logging.info(f"Created temp directory: {temp_dir}")
 
