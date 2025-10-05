@@ -4,6 +4,7 @@ import tempfile
 import os
 import time
 import subprocess
+import logging
 
 app = Flask(__name__)
 
@@ -102,27 +103,33 @@ def down():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ---- Spotify download endpoint (streams audio directly) ----
+logging.basicConfig(level=logging.DEBUG)
+
 @app.route("/spotify-down")
 def spotify_down():
     url = request.args.get("url")
     if not url:
+        logging.error("Missing url parameter")
         return jsonify({"error": "Missing url parameter"}), 400
 
     cookies_file = r"C:\Users\PC\Downloads\spotifycookies.txt"
     temp_dir = tempfile.mkdtemp()  # temporary output folder
+    logging.info(f"Created temp directory: {temp_dir}")
 
     cmd = [
         "votify",
         "--disable-wvd",
         "--cookies-path", cookies_file,
-        "--audio-quality", "aac-medium",  # low-quality audio
+        "--audio-quality", "aac-medium",  # medium quality audio
         "--output-path", temp_dir,
         url
     ]
+    logging.info(f"Running command: {' '.join(cmd)}")
 
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        logging.debug(f"STDOUT: {result.stdout}")
+        logging.debug(f"STDERR: {result.stderr}")
 
         # Find the actual audio file inside the temp directory
         audio_file_path = None
@@ -130,18 +137,22 @@ def spotify_down():
             for file in files:
                 if file.endswith((".ogg", ".mp3", ".m4a", ".wav")):
                     audio_file_path = os.path.join(root, file)
+                    logging.info(f"Found audio file: {audio_file_path}")
                     break
             if audio_file_path:
                 break
 
         if not audio_file_path:
+            logging.error("No audio file found in temp directory")
             return jsonify({"error": "No audio file found after votify download"}), 500
 
-        # Stream the file directly to the user
         return send_file(audio_file_path, as_attachment=True)
 
     except subprocess.CalledProcessError as e:
+        logging.error(f"Votify failed: {e.stderr}")
         return jsonify({"error": "Votify failed", "details": e.stderr}), 500
+    except Exception as e:
+        logging.exception("Unexpected error in s
 
 if __name__ == "__main__":
     try:
