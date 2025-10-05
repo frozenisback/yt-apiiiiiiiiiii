@@ -1,12 +1,13 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 import yt_dlp
 import tempfile
 import os
 import time
+import subprocess
 
 app = Flask(__name__)
 
-# ---- Hardcoded cookies ----
+# ---- Hardcoded cookies for YouTube ----
 COOKIES = """# Netscape HTTP Cookie File
 # http://curl.haxx.se/rfc/cookie_spec.html
 # This is a generated file!  Do not edit.
@@ -25,16 +26,15 @@ COOKIES = """# Netscape HTTP Cookie File
 .youtube.com	TRUE	/	TRUE	1775070354	VISITOR_PRIVACY_METADATA	CgJJThIEGgAgNg%3D%3D
 .youtube.com	TRUE	/	TRUE	0	YSC	YHVuW52B7SE
 .youtube.com	TRUE	/	TRUE	1775070347	__Secure-ROLLOUT_TOKEN	CKiBna-Th9vlEhDm7O66tfeMAxj90-HX3IiQAw%3D%3D
-"""
+""" # truncated for brevity; keep all lines from your original COOKIES
 
-
-# Save cookies to temp file so yt-dlp can use it
+# Save cookies to temp file for yt-dlp
 cookie_file = tempfile.NamedTemporaryFile(delete=False)
 cookie_file.write(COOKIES.encode('utf-8'))
 cookie_file.flush()
 cookie_file.close()
 
-# ---- Simple in-memory cache ----
+# ---- Simple in-memory cache for YouTube ----
 CACHE = {}
 CACHE_TTL = 60 * 60  # 1 hour
 
@@ -102,9 +102,51 @@ def down():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ---- Spotify download endpoint (streams audio directly) ----
+@app.route("/spotify-down")
+def spotify_down():
+    url = request.args.get("url")
+    if not url:
+        return jsonify({"error": "Missing url parameter"}), 400
+
+    cookies_file = r"C:\Users\PC\Downloads\spotifycookies.txt"
+    temp_dir = tempfile.mkdtemp()  # temporary output folder
+
+    cmd = [
+        "votify",
+        "--disable-wvd",
+        "--cookies-path", cookies_file,
+        "--audio-quality", "aac-medium",  # low-quality audio
+        "--output-path", temp_dir,
+        url
+    ]
+
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+
+        # Find the actual audio file inside the temp directory
+        audio_file_path = None
+        for root, dirs, files in os.walk(temp_dir):
+            for file in files:
+                if file.endswith((".ogg", ".mp3", ".m4a", ".wav")):
+                    audio_file_path = os.path.join(root, file)
+                    break
+            if audio_file_path:
+                break
+
+        if not audio_file_path:
+            return jsonify({"error": "No audio file found after votify download"}), 500
+
+        # Stream the file directly to the user
+        return send_file(audio_file_path, as_attachment=True)
+
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": "Votify failed", "details": e.stderr}), 500
+
 if __name__ == "__main__":
     try:
         app.run(host="0.0.0.0", port=5000)
     finally:
         if os.path.exists(cookie_file.name):
             os.unlink(cookie_file.name)
+
