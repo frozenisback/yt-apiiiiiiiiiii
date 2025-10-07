@@ -113,15 +113,16 @@ def spotify_down():
         return jsonify({"error": "Missing url parameter"}), 400
 
     cookies_file = "spotifycookies.txt"
-    temp_dir = tempfile.mkdtemp()  # temporary output folder
-    logging.info(f"Created temp directory: {temp_dir}")
+    output_dir = "downloads"  # persistent folder
+    os.makedirs(output_dir, exist_ok=True)
+    logging.info(f"Using persistent output directory: {output_dir}")
 
     cmd = [
         "votify",
         "--disable-wvd",
         "--cookies-path", cookies_file,
-        "--audio-quality", "aac-medium",  # medium quality audio
-        "--output-path", temp_dir,
+        "--audio-quality", "aac-medium",
+        "--output-path", output_dir,
         url
     ]
     logging.info(f"Running command: {' '.join(cmd)}")
@@ -131,9 +132,9 @@ def spotify_down():
         logging.debug(f"STDOUT: {result.stdout}")
         logging.debug(f"STDERR: {result.stderr}")
 
-        # Find the actual audio file inside the temp directory
+        # Find the downloaded audio file in the output folder
         audio_file_path = None
-        for root, dirs, files in os.walk(temp_dir):
+        for root, dirs, files in os.walk(output_dir):
             for file in files:
                 if file.endswith((".ogg", ".mp3", ".m4a", ".wav")):
                     audio_file_path = os.path.join(root, file)
@@ -143,7 +144,7 @@ def spotify_down():
                 break
 
         if not audio_file_path:
-            logging.error("No audio file found in temp directory")
+            logging.error("No audio file found in output directory")
             return jsonify({"error": "No audio file found after votify download"}), 500
 
         return send_file(audio_file_path, as_attachment=True)
@@ -154,6 +155,7 @@ def spotify_down():
     except Exception as e:
         logging.exception("Unexpected error in spotify_down")
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     try:
