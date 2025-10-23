@@ -48,6 +48,8 @@ cookie_file.close()
 CACHE = {}
 CACHE_TTL = 60 * 60  # 1 hour
 
+PLAYER_CLIENTS = ["android", "ios", "tvhtml5", "web"]
+
 @app.route("/")
 def home():
     return "yt cdn resolver is alive baby"
@@ -105,6 +107,57 @@ def down():
         return jsonify({"error": str(e)}), 500
 
 logging.basicConfig(level=logging.DEBUG)
+
+@app.route("/debug-down")
+def debug_down():
+    url = request.args.get("url")
+    if not url:
+        return jsonify({"error": "Missing url parameter"}), 400
+
+    results = {}
+    for client in PLAYER_CLIENTS:
+        ydl_opts = {
+            "quiet": True,
+            "skip_download": True,
+            "noplaylist": True,
+            "cookiefile": cookie_file.name,
+            "format": "bestaudio/best",
+            "player_client": client,
+        }
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                title = info.get("title", "Unknown Title")
+
+                # yt-dlp may have multiple formats
+                formats = info.get("formats", [])
+                urls = []
+                for f in formats:
+                    if f.get("url"):
+                        urls.append({
+                            "format_id": f.get("format_id"),
+                            "ext": f.get("ext"),
+                            "abr": f.get("abr"),
+                            "url": f.get("url")
+                        })
+
+                # fallback if "formats" not present
+                if not urls and info.get("url"):
+                    urls.append({
+                        "format_id": "direct",
+                        "ext": info.get("ext"),
+                        "abr": info.get("abr"),
+                        "url": info.get("url")
+                    })
+
+                results[client] = {
+                    "title": title,
+                    "urls": urls
+                }
+        except Exception as e:
+            results[client] = {"error": str(e)}
+
+    return jsonify(results)
 
 
 @app.route("/spotify-down")
