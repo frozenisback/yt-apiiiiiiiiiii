@@ -72,7 +72,11 @@ def down():
         "skip_download": True,
         "noplaylist": True,
         "cookiefile": cookie_file.name,
-        "format": "bestaudio",  # Force audio-only formats
+        "format": "bestaudio[abr<=48]/bestaudio",  # pick audio <=48kbps if available
+        "youtube_include_dash_manifest": False,
+        "extract_flat": False,
+        "force_generic_extractor": False,
+        "player_client": "android",  # forces old client giving direct HTTP audio
     }
 
     try:
