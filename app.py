@@ -72,7 +72,7 @@ def down():
         "skip_download": True,
         "noplaylist": True,
         "cookiefile": cookie_file.name,
-        "format": "bestaudio[abr<=48]/bestaudio",  # pick audio <=48kbps if available
+        "format": "249",  # force Opus 52kbps
         "youtube_include_dash_manifest": False,
         "extract_flat": False,
         "force_generic_extractor": False,
@@ -84,19 +84,7 @@ def down():
             info = ydl.extract_info(url, download=False)
             title = info.get("title", "Unknown Title")
 
-            # Only audio formats (filter out any with video)
-            audio_formats = [
-                f for f in info.get("formats", [])
-                if f.get("acodec") != "none" and f.get("vcodec") == "none"
-            ]
-            if not audio_formats:
-                return jsonify({"error": "No pure audio formats found"}), 404
-
-            # Sort by audio bitrate ascending (lowest first)
-            audio_formats.sort(key=lambda f: f.get("abr", 0) or 0)
-            lowest_audio = audio_formats[0]
-            audio_url = lowest_audio.get("url")
-
+            audio_url = info.get("url")
             if not audio_url:
                 return jsonify({"error": "Could not extract audio URL"}), 500
 
@@ -117,6 +105,7 @@ def down():
         return jsonify({"error": str(e)}), 500
 
 logging.basicConfig(level=logging.DEBUG)
+
 
 @app.route("/spotify-down")
 def spotify_down():
