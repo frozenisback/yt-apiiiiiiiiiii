@@ -8,23 +8,45 @@ import logging
 
 app = Flask(__name__)
 
+# ---- Auto Install Deno if missing ----
+def ensure_deno_installed():
+    try:
+        result = subprocess.run(["deno", "--version"], capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"[INIT] Deno detected: {result.stdout.strip()}")
+            return True
+        else:
+            print("[INIT] Deno not found, attempting to install...")
+    except FileNotFoundError:
+        print("[INIT] Deno not found, installing...")
+
+    try:
+        subprocess.run("curl -fsSL https://deno.land/install.sh | sh", shell=True, check=True)
+        deno_path = os.path.expanduser("~/.deno/bin/deno")
+        if os.path.exists(deno_path):
+            os.environ["PATH"] = f"{os.path.expanduser('~/.deno/bin')}:{os.environ['PATH']}"
+            print("[INIT] Deno installed successfully and added to PATH.")
+            return True
+        else:
+            print("[INIT ERROR] Deno install script ran but binary not found.")
+            return False
+    except Exception as e:
+        print(f"[INIT ERROR] Failed to install Deno: {e}")
+        return False
+
 # ---- yt-dlp EJS Solver Initializer ----
 def init_yt_dlp_solver():
     try:
-        # Check if Deno is available
-        deno_version = subprocess.run(["deno", "--version"], capture_output=True, text=True)
-        if deno_version.returncode == 0:
-            print(f"[INIT] Deno detected: {deno_version.stdout.strip()}")
-        else:
-            print("[INIT] Deno not found in PATH, signature solving may fail.")
+        if not ensure_deno_installed():
+            print("[INIT WARNING] Deno missing. Signature solving may fail.")
 
-        # Update yt-dlp to nightly (for latest n/sig patches)
+        # Update yt-dlp to nightly for latest cipher fixes
         subprocess.run(["yt-dlp", "--update-to", "nightly"], check=False)
 
         # Clear old caches
         subprocess.run(["yt-dlp", "--rm-cache-dir"], check=False)
 
-        # Preload EJS challenge solver (download GitHub script)
+        # Preload EJS challenge solver
         subprocess.run([
             "yt-dlp",
             "--remote-components", "ejs:github",
@@ -35,44 +57,23 @@ def init_yt_dlp_solver():
     except Exception as e:
         print(f"[INIT ERROR] Failed to initialize yt-dlp EJS solver: {e}")
 
+# ---- COOKIES ----
 COOKIES = """# Netscape HTTP Cookie File
 # https://curl.haxx.se/rfc/cookie_spec.html
 # This is a generated file! Do not edit.
-
 .youtube.com	TRUE	/	FALSE	1793522371	HSID	AdzGzDS-sv2Dxh6gj
 .youtube.com	TRUE	/	TRUE	1793522371	SSID	ANodiydGwjRxMjhLQ
 .youtube.com	TRUE	/	FALSE	1793522371	APISID	cifAe6-LMoB3BUto/AwbmzxwAD66JAoIw_
-.youtube.com	TRUE	/	TRUE	1793522371	SAPISID	-cgl78xgveTJP47w/AUVxC_-SVrfy5iRB0
-.youtube.com	TRUE	/	TRUE	1793522371	__Secure-1PAPISID	-cgl78xgveTJP47w/AUVxC_-SVrfy5iRB0
-.youtube.com	TRUE	/	TRUE	1793522371	__Secure-3PAPISID	-cgl78xgveTJP47w/AUVxC_-SVrfy5iRB0
-.youtube.com	TRUE	/	TRUE	1786086169	LOGIN_INFO	AFmmF2swRAIgVCS48KA4Vsnvw4XEZHhCKzYYUHF9HCarHDCTVlVDzpgCIG2Fb0rOZvZg8Z6Wjmg79suIPf015V-gBINGgHE_eE4Y:QUQ3MjNmeVZqdE5NT1B5SGc2ekNWZUZ3andwSUo1VlFnWkpmUkVNaWc1TWZnUXNIcFZ2T1NzOUxnY3lwSkY0aC1FMWJSa1pmbHlFa1p6RFNMaDVOM3F2ZWlzamctV1lFbThiNjdsZ0thNmJkQXcxSExHcDdoR0ZlRzZrWnAtYk5Eem1NMHFCM3c4S3RaSlVzVjBUNHZlZGt1TmJCUnJwdWRR
-.youtube.com	TRUE	/	TRUE	1795763712	PREF	f6=40000000&tz=Asia.Colombo&f7=100
-.youtube.com	TRUE	/	FALSE	1793522371	SID	g.a0001wjd40BhqOqMatYP51PeewZOAeUiC1P7Bzuva4ilJNUcqNG9tpJbiuphkKVcJqink3W-QwACgYKAVwSARISFQHGX2MixPCvckbV-IEmDQI2oM85cRoVAUF8yKp21BhW70vfMqy99ubctT2C0076
-.youtube.com	TRUE	/	TRUE	1793522371	__Secure-1PSID	g.a0001wjd40BhqOqMatYP51PeewZOAeUiC1P7Bzuva4ilJNUcqNG9b97q6fAc4xfnKyicZPFiwgACgYKAT0SARISFQHGX2Mi23MYY1P8KTnGhLRKm7c5pRoVAUF8yKo2tWPkWhgMkASEMPx9hRKo0076
-.youtube.com	TRUE	/	TRUE	1793522371	__Secure-3PSID	g.a0001wjd40BhqOqMatYP51PeewZOAeUiC1P7Bzuva4ilJNUcqNG9yBo6TzXkeGNEOpnLReKTBgACgYKAYwSARISFQHGX2MibJqjQzngW5KClf4JUqtDERoVAUF8yKr_OxIHjmMvMDZn-feF5Zxc0076
-.youtube.com	TRUE	/	TRUE	1792739711	__Secure-1PSIDTS	sidts-CjEBmkD5S6MvitZbQVpbCidr88gjdJfNLkm_Pvk9vJVlpPWWJBUbmoKhMdCJ2abNfuOOEAA
-.youtube.com	TRUE	/	TRUE	1792739711	__Secure-3PSIDTS	sidts-CjEBmkD5S6MvitZbQVpbCidr88gjdJfNLkm_Pvk9vJVlpPWWJBUbmoKhMdCJ2abNfuOOEAA
-.youtube.com	TRUE	/	FALSE	1761203726	ST-hcbf8d	session_logininfo=AFmmF2swRAIgVCS48KA4Vsnvw4XEZHhCKzYYUHF9HCarHDCTVlVDzpgCIG2Fb0rOZvZg8Z6Wjmg79suIPf015V-gBINGgHE_eE4Y%3AQUQ3MjNmeVZqdE5NT1B5SGc2ekNWZUZ3andwSUo1VlFnWkpmUkVNaWc1TWZnUXNIcFZ2T1NzOUxnY3lwSkY0aC1FMWJSa1pmbHlFa1p6RFNMaDVOM3F2ZWlzamctV1lFbThiNjdsZ0thNmJkQXcxSExHcDdoR0ZlRzZrWnAtYk5Eem1NMHFCM3c4S3RaSlVzVjBUNHZlZGt1TmJCUnJwdWRR
-.youtube.com	TRUE	/	FALSE	1792739720	SIDCC	AKEyXzVg4vtTr0WhzNJiPkYJchLrlkN_N2eZzEupvA62EJwtoew4I04hvWShFl8o4yoDOnNY
-.youtube.com	TRUE	/	TRUE	1792739720	__Secure-1PSIDCC	AKEyXzXd6cfWsqtmB1l53p-9p5P1ItifHM9N-QRyXYEYVMc7sSrE7WJhu812yTMw7HwoQ76IUg
-.youtube.com	TRUE	/	TRUE	1792739720	__Secure-3PSIDCC	AKEyXzWb6Mo6gMPvkLdx7kSHhQQbC8PaKmeLyUOAhizj_TrfqyfUSiqSoaem5COacK1wlxvE9A
-.youtube.com	TRUE	/	TRUE	1761204321	CONSISTENCY	AKreu9ttuvDS0pWGd1CdvoKpD6-OLmpVhiPDF2Jy1wIgizglmRvhl6qEJbcShTrZYNVbGCW31FTtC8xk7S0fg86bQ4Jj54ZczJ-96W2-V2X-1z0daktAec0rl3wvB8tXQs4saHEpYgsAoz49VujwYMJ6
-.youtube.com	TRUE	/	TRUE	1776755715	VISITOR_INFO1_LIVE	gD_fnWox6Ow
-.youtube.com	TRUE	/	TRUE	1776755715	VISITOR_PRIVACY_METADATA	CgJJThIEGgAgNg%3D%3D
-.youtube.com	TRUE	/	TRUE	0	YSC	cV5enldHPGo
-.youtube.com	TRUE	/	TRUE	1776755707	__Secure-ROLLOUT_TOKEN	CLG-o5yt_cPRCBC6xeODuKCOAxjfxJSX47mQAw%3D%3D
-""" # truncated for brevity; keep all lines from your original COOKIES
+"""  # truncated; use your full cookies
 
-# Save cookies to temp file for yt-dlp
 cookie_file = tempfile.NamedTemporaryFile(delete=False)
-cookie_file.write(COOKIES.encode('utf-8'))
+cookie_file.write(COOKIES.encode("utf-8"))
 cookie_file.flush()
 cookie_file.close()
 
-# ---- Simple in-memory cache for YouTube ----
+# ---- Simple Cache ----
 CACHE = {}
 CACHE_TTL = 60 * 60  # 1 hour
-
 PLAYER_CLIENTS = ["android", "ios", "tvhtml5", "web"]
 
 @app.route("/")
@@ -85,7 +86,6 @@ def down():
     if not url:
         return jsonify({"error": "Missing url parameter"}), 400
 
-    # Serve from cache if fresh
     now = time.time()
     if url in CACHE and now - CACHE[url]["timestamp"] < CACHE_TTL:
         return jsonify({
@@ -99,7 +99,7 @@ def down():
         "skip_download": True,
         "noplaylist": True,
         "cookiefile": cookie_file.name,
-        "format": "249",  # Opus 52kbps
+        "format": "249",
         "youtube_include_dash_manifest": False,
         "extract_flat": False,
         "force_generic_extractor": False
@@ -109,12 +109,11 @@ def down():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             title = info.get("title", "Unknown Title")
-
             audio_url = info.get("url")
+
             if not audio_url:
                 return jsonify({"error": "Could not extract audio URL"}), 500
 
-            # Store in cache
             CACHE[url] = {
                 "audio": audio_url,
                 "title": title,
@@ -126,11 +125,10 @@ def down():
                 "title": title,
                 "cached": False
             })
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
+# ---- Debug Endpoint ----
 logging.basicConfig(level=logging.DEBUG)
 
 @app.route("/debug-down")
@@ -153,38 +151,31 @@ def debug_down():
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 title = info.get("title", "Unknown Title")
-
-                # yt-dlp may have multiple formats
                 formats = info.get("formats", [])
-                urls = []
-                for f in formats:
-                    if f.get("url"):
-                        urls.append({
-                            "format_id": f.get("format_id"),
-                            "ext": f.get("ext"),
-                            "abr": f.get("abr"),
-                            "url": f.get("url")
-                        })
-
-                # fallback if "formats" not present
+                urls = [
+                    {
+                        "format_id": f.get("format_id"),
+                        "ext": f.get("ext"),
+                        "abr": f.get("abr"),
+                        "url": f.get("url"),
+                    }
+                    for f in formats if f.get("url")
+                ]
                 if not urls and info.get("url"):
                     urls.append({
                         "format_id": "direct",
                         "ext": info.get("ext"),
                         "abr": info.get("abr"),
-                        "url": info.get("url")
+                        "url": info.get("url"),
                     })
 
-                results[client] = {
-                    "title": title,
-                    "urls": urls
-                }
+                results[client] = {"title": title, "urls": urls}
         except Exception as e:
             results[client] = {"error": str(e)}
 
     return jsonify(results)
 
-
+# ---- Spotify Downloader ----
 @app.route("/spotify-down")
 def spotify_down():
     url = request.args.get("url")
@@ -193,7 +184,7 @@ def spotify_down():
         return jsonify({"error": "Missing url parameter"}), 400
 
     cookies_file = "spotifycookies.txt"
-    output_dir = "downloads"  # persistent folder
+    output_dir = "downloads"
     os.makedirs(output_dir, exist_ok=True)
     logging.info(f"Using persistent output directory: {output_dir}")
 
@@ -212,7 +203,6 @@ def spotify_down():
         logging.debug(f"STDOUT: {result.stdout}")
         logging.debug(f"STDERR: {result.stderr}")
 
-        # Find the downloaded audio file in the output folder
         audio_file_path = None
         for root, dirs, files in os.walk(output_dir):
             for file in files:
@@ -236,7 +226,7 @@ def spotify_down():
         logging.exception("Unexpected error in spotify_down")
         return jsonify({"error": str(e)}), 500
 
-
+# ---- Run App ----
 if __name__ == "__main__":
     init_yt_dlp_solver()
     try:
