@@ -16,47 +16,54 @@ def ensure_deno_installed():
             print(f"[INIT] Deno detected: {result.stdout.strip()}")
             return True
         else:
-            print("[INIT] Deno not found, attempting to install...")
+            print("[INIT] Deno not found in PATH, installing...")
     except FileNotFoundError:
         print("[INIT] Deno not found, installing...")
 
     try:
-        subprocess.run("curl -fsSL https://deno.land/install.sh | sh", shell=True, check=True)
-        deno_path = os.path.expanduser("~/.deno/bin/deno")
-        if os.path.exists(deno_path):
-            os.environ["PATH"] = f"{os.path.expanduser('~/.deno/bin')}:{os.environ['PATH']}"
-            print("[INIT] Deno installed successfully and added to PATH.")
+        install_dir = "/app/.deno"
+        os.makedirs(install_dir, exist_ok=True)
+        subprocess.run(
+            ["curl", "-fsSL", "https://deno.land/install.sh", "-o", "install_deno.sh"],
+            check=True
+        )
+        subprocess.run(
+            ["sh", "install_deno.sh"],
+            env={"DENO_INSTALL": install_dir},
+            check=True
+        )
+        os.environ["PATH"] += os.pathsep + f"{install_dir}/bin"
+
+        # Confirm installation works now
+        check = subprocess.run(
+            [f"{install_dir}/bin/deno", "--version"],
+            capture_output=True,
+            text=True
+        )
+        if check.returncode == 0:
+            print(f"[INIT] Deno installed successfully: {check.stdout.strip()}")
             return True
         else:
-            print("[INIT ERROR] Deno install script ran but binary not found.")
+            print("[INIT ERROR] Deno install failed verification.")
             return False
     except Exception as e:
         print(f"[INIT ERROR] Failed to install Deno: {e}")
         return False
 
+
 # ---- yt-dlp EJS Solver Initializer ----
 def init_yt_dlp_solver():
     try:
-        # Check or install Deno
-        deno_check = subprocess.run(["deno", "--version"], capture_output=True, text=True)
-        if deno_check.returncode != 0:
-            print("[INIT] Deno not found. Installing...")
-            subprocess.run([
-                "curl", "-fsSL", "https://deno.land/install.sh", "-o", "install_deno.sh"
-            ], check=True)
-            subprocess.run(["sh", "install_deno.sh"], env={"DENO_INSTALL": "/app/.deno"}, check=True)
-            os.environ["PATH"] += os.pathsep + "/app/.deno/bin"
-            print("[INIT] Deno installed successfully and added to PATH.")
-        else:
-            print(f"[INIT] Deno detected: {deno_check.stdout.strip()}")
+        # Ensure Deno present
+        ensure_deno_installed()
 
-        # Try updating yt-dlp
+        # Update yt-dlp (nightly)
         subprocess.run(["yt-dlp", "--update-to", "nightly"], check=False)
 
-        # Clear cache
+        # Clear old cache
         subprocess.run(["yt-dlp", "--rm-cache-dir"], check=False)
 
-        # Trigger signature decryptor warm-up
+        # Warm-up signature decryptor
         subprocess.run([
             "yt-dlp",
             "--simulate",
@@ -67,7 +74,6 @@ def init_yt_dlp_solver():
         print("[INIT] yt-dlp EJS challenge solver initialized successfully.")
     except Exception as e:
         print(f"[INIT ERROR] Failed to initialize yt-dlp EJS solver: {e}")
-
 
 # ---- COOKIES ----
 COOKIES = """# Netscape HTTP Cookie File
